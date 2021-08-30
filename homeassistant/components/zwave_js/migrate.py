@@ -32,6 +32,7 @@ from .helpers import get_device_id, get_unique_id
 _LOGGER = logging.getLogger(__name__)
 
 LEGACY_ZWAVE_MIGRATION = f"{DOMAIN}_legacy_zwave_migration"
+STORAGE_WRITE_DELAY = 30
 STORAGE_KEY = "zwave_js.legacy_zwave_migration"
 STORAGE_VERSION = 1
 
@@ -141,7 +142,7 @@ class LegacyZWaveMigration:
     ) -> None:
         """Save Z-Wave JS migration data."""
         self._zwave_js_data.update(data)
-        self._store.async_delay_save(self._data_to_save, 10)
+        self._store.async_delay_save(self._data_to_save, STORAGE_WRITE_DELAY)
 
     @callback
     def _data_to_save(self) -> dict[str, dict[str, dict[str, int | str | None]]]:
