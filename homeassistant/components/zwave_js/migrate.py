@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import json
 import logging
-from pathlib import Path
+from typing import cast
 
 from zwave_js_server.client import Client as ZwaveClient
 from zwave_js_server.model.value import Value as ZwaveValue
@@ -23,12 +22,18 @@ from homeassistant.helpers.entity_registry import (
     async_entries_for_device,
     async_get as async_get_entity_registry,
 )
+from homeassistant.helpers.singleton import singleton
+from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
 from .discovery import ZwaveDiscoveryInfo
 from .helpers import get_device_id, get_unique_id
 
 _LOGGER = logging.getLogger(__name__)
+
+LEGACY_ZWAVE_MIGRATION = f"{DOMAIN}_legacy_zwave_migration"
+STORAGE_KEY = "zwave_js.legacy_zwave_migration"
+STORAGE_VERSION = 1
 
 # Use the following data to map entity entries
 # between zwave and zwave_js:
@@ -73,53 +78,93 @@ CC_ID_LABEL_TO_PROPERTY = {
 }
 
 
-async def async_get_migration_data(
-    hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    all_discovered_values: dict[str, ZwaveDiscoveryInfo],
-) -> dict:
-    """Return dict with zwave_js side migration info."""
-    data = {}
-    ent_reg = async_get_entity_registry(hass)
-    entity_entries = async_entries_for_config_entry(ent_reg, config_entry.entry_id)
-    unique_entries = {entry.unique_id: entry for entry in entity_entries}
-    dev_reg = async_get_device_registry(hass)
+@singleton(LEGACY_ZWAVE_MIGRATION)
+@callback
+def get_legacy_zwave_migration(hass: HomeAssistant) -> LegacyZWaveMigration:
+    """Return legacy Z-Wave migration handler."""
+    return LegacyZWaveMigration(hass)
 
-    for info in all_discovered_values.values():
-        node = info.node
-        primary_value = info.primary_value
-        unique_id = get_unique_id(
-            node.client.driver.controller.home_id, primary_value.value_id
-        )
-        if unique_id not in unique_entries:
-            _LOGGER.debug("Missing entity entry for: %s", unique_id)
-            continue
-        entity_entry = unique_entries[unique_id]
-        device_identifier = get_device_id(node.client, node)
-        device_entry = dev_reg.async_get_device({device_identifier}, set())
-        if not device_entry:
-            _LOGGER.debug("Missing device entry for: %s", device_identifier)
-            continue
-        data[unique_id] = {
-            "node_id": node.node_id,
-            "endpoint_index": node.index,
-            "command_class": primary_value.command_class,
-            "value_property_name": primary_value.property_name,
-            "value_property_key_name": primary_value.property_key_name,
-            "value_id": primary_value.value_id,
-            "device_id": device_entry.id,
-            "domain": entity_entry.domain,
-            "entity_id": entity_entry.entity_id,
-            "unique_id": unique_id,
-            "unit_of_measurement": entity_entry.unit_of_measurement,
-        }
 
-    save_path = Path(hass.config.path("zwave_js_migration_data.json"))
-    await hass.async_add_executor_job(save_path.write_text, json.dumps(data, indent=2))
+class LegacyZWaveMigration:
+    """Handle the migration from zwave to zwave_js."""
 
-    _LOGGER.debug("Collected migration data: %s", data)
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Set up migration instance."""
+        self._hass = hass
+        self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        self._zwave_js_data: dict[str, dict[str, dict[str, int | str | None]]] = {}
 
-    return data
+    async def load_zwave_js_data(self) -> None:
+        """Load Z-Wave JS migration data."""
+        stored = cast(dict, await self._store.async_load())
+        if stored:
+            self._zwave_js_data = stored
+
+    @callback
+    def save_zwave_js_data(
+        self, data: dict[str, dict[str, dict[str, int | str | None]]]
+    ) -> None:
+        """Save Z-Wave JS migration data."""
+        self._zwave_js_data.update(data)
+        self._store.async_delay_save(self._data_to_save, 10)
+
+    @callback
+    def _data_to_save(self) -> dict[str, dict[str, dict[str, int | str | None]]]:
+        """Return data to save."""
+        return self._zwave_js_data
+
+    async def generate_zwave_js_data(
+        self,
+        config_entry: ConfigEntry,
+        all_discovered_values: dict[str, ZwaveDiscoveryInfo],
+    ) -> None:
+        """Create zwave_js side migration data for a config entry."""
+        data: dict[str, dict[str, int | str | None]] = {}
+        ent_reg = async_get_entity_registry(self._hass)
+        entity_entries = async_entries_for_config_entry(ent_reg, config_entry.entry_id)
+        unique_entries = {entry.unique_id: entry for entry in entity_entries}
+        dev_reg = async_get_device_registry(self._hass)
+
+        for info in all_discovered_values.values():
+            node = info.node
+            primary_value = info.primary_value
+            unique_id = get_unique_id(
+                node.client.driver.controller.home_id, primary_value.value_id
+            )
+            if unique_id not in unique_entries:
+                _LOGGER.debug("Missing entity entry for: %s", unique_id)
+                continue
+            entity_entry = unique_entries[unique_id]
+            device_identifier = get_device_id(node.client, node)
+            device_entry = dev_reg.async_get_device({device_identifier}, set())
+            if not device_entry:
+                _LOGGER.debug("Missing device entry for: %s", device_identifier)
+                continue
+            data[unique_id] = {
+                "node_id": node.node_id,
+                "endpoint_index": node.index,
+                "command_class": primary_value.command_class,
+                "value_property_name": primary_value.property_name,
+                "value_property_key_name": primary_value.property_key_name,
+                "value_id": primary_value.value_id,
+                "device_id": device_entry.id,
+                "domain": entity_entry.domain,
+                "entity_id": entity_entry.entity_id,
+                "unique_id": unique_id,
+                "unit_of_measurement": entity_entry.unit_of_measurement,
+            }
+
+        _LOGGER.debug("Collected migration data: %s", data)
+
+        self.save_zwave_js_data({config_entry.entry_id: data})
+
+    async def get_entry_zwave_js_data(
+        self, config_entry: ConfigEntry
+    ) -> dict[str, dict[str, int | str | None]]:
+        """Return Z-Wave JS migration data for a config entry."""
+        await self.load_zwave_js_data()
+        data = self._zwave_js_data.get(config_entry.entry_id)
+        return data or {}
 
 
 @dataclass

@@ -70,7 +70,7 @@ from .const import (
 )
 from .discovery import ZwaveDiscoveryInfo, async_discover_values
 from .helpers import async_enable_statistics, get_device_id, get_unique_id
-from .migrate import async_get_migration_data, async_migrate_discovered_value
+from .migrate import async_migrate_discovered_value, get_legacy_zwave_migration
 from .services import ZWaveServices
 
 CONNECT_TIMEOUT = 10
@@ -116,6 +116,8 @@ async def async_setup_entry(  # noqa: C901
     hass: HomeAssistant, entry: ConfigEntry
 ) -> bool:
     """Set up Z-Wave JS from a config entry."""
+    legacy_zwave_migration = get_legacy_zwave_migration(hass)
+
     use_addon = entry.data.get(CONF_USE_ADDON)
     if use_addon:
         await async_ensure_addon_running(hass, entry)
@@ -183,7 +185,9 @@ async def async_setup_entry(  # noqa: C901
 
         # Check if all known nodes are ready to collect migration data
         if all(node.ready for node in client.driver.controller.nodes.values()):
-            await async_get_migration_data(hass, entry, all_discovered_values)
+            await legacy_zwave_migration.generate_zwave_js_data(
+                entry, all_discovered_values
+            )
 
         # add listener for value updated events if necessary
         if value_updates_disc_info:
