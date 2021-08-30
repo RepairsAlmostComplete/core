@@ -57,7 +57,7 @@ STORAGE_VERSION = 1
 # Something corresponding to propertyKeyName missing in zwave
 # Check if we can get the meterType from openzwave
 
-NOTIFICATION_CC_LABEL_TO_PROPERTY = {
+NOTIFICATION_CC_LABEL_TO_PROPERTY_NAME = {
     "Smoke": "Smoke Alarm",
     "Carbon Monoxide": "CO Alarm",
     "Carbon Dioxide": "CO2 Alarm",
@@ -73,8 +73,43 @@ NOTIFICATION_CC_LABEL_TO_PROPERTY = {
     "HomeHealth": "Home Health",
 }
 
+SENSOR_MULTILEVEL_CC_LABEL_TO_PROPERTY_NAME = {
+    "Temperature": "Air temperature",
+    "General": "General purpose",
+    "Luminance": "Illuminance",
+    "Power": "Power",
+    "Relative Humidity": "Humidity",
+    "Velocity": "Velocity",
+    "Direction": "Direction",
+    "Atmospheric Pressure": "Atmospheric pressure",
+    "Barometric Pressure": "Barometric pressure",
+    "Solar Radiation": "Solar radiation",
+    "Dew Point": "Dew point",
+    "Rain Rate": "Rain rate",
+    "Tide Level": "Tide level",
+    "Weight": "Weight",
+    "Voltage": "Voltage",
+    "Current": "Current",
+    "CO2 Level": "Carbon dioxide (CO₂) level",
+    "Air Flow": "Air flow",
+    "Tank Capacity": "Tank capacity",
+    "Distance": "Distance",
+    "Angle Position": "Angle position",
+    "Rotation": "Rotation",
+    "Water Temperature": "Water temperature",
+    "Soil Temperature": "Soil temperature",
+    "Seismic Intensity": "Seismic Intensity",
+    "Seismic Magnitude": "Seismic magnitude",
+    "Ultraviolet": "Ultraviolet",
+    "Electrical Resistivity": "Electrical resistivity",
+    "Electrical Conductivity": "Electrical conductivity",
+    "Loudness": "Loudness",
+    "Moisture": "Moisture",
+}
+
 CC_ID_LABEL_TO_PROPERTY = {
-    113: NOTIFICATION_CC_LABEL_TO_PROPERTY,
+    49: SENSOR_MULTILEVEL_CC_LABEL_TO_PROPERTY_NAME,
+    113: NOTIFICATION_CC_LABEL_TO_PROPERTY_NAME,
 }
 
 
