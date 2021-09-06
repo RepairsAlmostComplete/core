@@ -40,7 +40,6 @@ DATA_DEVICES = "zwave_devices"
 DATA_NETWORK = "zwave_network"
 DATA_ENTITY_VALUES = "zwave_entity_values"
 DATA_ZWAVE_CONFIG = "zwave_config"
-DATA_ZWAVE_CONFIG_YAML_PRESENT = "zwave_config_yaml_present"
 
 SERVICE_CHANGE_ASSOCIATION = "change_association"
 SERVICE_ADD_NODE = "add_node"

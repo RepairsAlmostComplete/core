@@ -48,7 +48,6 @@ from .const import (
     DATA_ENTITY_VALUES,
     DATA_NETWORK,
     DATA_ZWAVE_CONFIG,
-    DATA_ZWAVE_CONFIG_YAML_PRESENT,
     DEFAULT_CONF_AUTOHEAL,
     DEFAULT_CONF_USB_STICK_PATH,
     DEFAULT_DEBUG,
@@ -56,7 +55,11 @@ from .const import (
     DOMAIN,
 )
 from .discovery_schemas import DISCOVERY_SCHEMAS
-from .migration import async_get_ozw_migration_data, async_is_ozw_migrated
+from .migration import (  # noqa: F401 pylint: disable=unused-import
+    async_generate_migration_data,
+    async_get_migration_data,
+    async_is_ozw_migrated,
+)
 from .node_entity import ZWaveBaseEntity, ZWaveNodeEntity
 from .util import (
     check_has_unique_id,
@@ -83,6 +86,8 @@ CONF_REFRESH_DELAY = "delay"
 CONF_DEVICE_CONFIG = "device_config"
 CONF_DEVICE_CONFIG_GLOB = "device_config_glob"
 CONF_DEVICE_CONFIG_DOMAIN = "device_config_domain"
+
+DATA_ZWAVE_CONFIG_YAML_PRESENT = "zwave_config_yaml_present"
 
 DEFAULT_CONF_IGNORED = False
 DEFAULT_CONF_INVERT_OPENCLOSE_BUTTONS = False
@@ -347,8 +352,20 @@ async def async_setup_entry(hass, config_entry):  # noqa: C901
     from pydispatch import dispatcher
 
     if async_is_ozw_migrated(hass):
+
+        if hass.data.get(DATA_ZWAVE_CONFIG_YAML_PRESENT):
+            config_yaml_message = (
+                ", and remove %s from configuration.yaml "
+                "to avoid setting up this integration on restart ",
+                DOMAIN,
+            )
+        else:
+            config_yaml_message = ""
+
         _LOGGER.error(
-            "Migration to ozw has been done. Please remove the zwave integration"
+            "Migration to ozw has been done. Please remove the %s integration%s",
+            DOMAIN,
+            config_yaml_message,
         )
         return False
 
@@ -534,7 +551,7 @@ async def async_setup_entry(hass, config_entry):  # noqa: C901
             "Z-Wave network is complete. All nodes on the network have been queried"
         )
         hass.bus.fire(const.EVENT_NETWORK_COMPLETE)
-        hass.add_job(async_get_ozw_migration_data(hass))
+        hass.add_job(async_generate_migration_data(hass, config_entry))
 
     def network_complete_some_dead():
         """Handle the querying of all nodes on network."""
