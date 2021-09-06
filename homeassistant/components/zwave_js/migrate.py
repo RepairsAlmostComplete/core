@@ -33,7 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 
 LEGACY_ZWAVE_MIGRATION = f"{DOMAIN}_legacy_zwave_migration"
 STORAGE_WRITE_DELAY = 30
-STORAGE_KEY = "zwave_js.legacy_zwave_migration"
+STORAGE_KEY = f"{DOMAIN}.legacy_zwave_migration"
 STORAGE_VERSION = 1
 
 # Use the following data to map entity entries
