@@ -3,9 +3,7 @@
 import asyncio
 import copy
 from importlib import import_module
-import json
 import logging
-from pathlib import Path
 from pprint import pprint
 
 import voluptuous as vol
@@ -31,7 +29,6 @@ from homeassistant.helpers.entity import generate_entity_id
 from homeassistant.helpers.entity_component import DEFAULT_SCAN_INTERVAL
 from homeassistant.helpers.entity_platform import EntityPlatform
 from homeassistant.helpers.entity_registry import (
-    async_entries_for_config_entry,
     async_get_registry as async_get_entity_registry,
 )
 from homeassistant.helpers.entity_values import EntityValues
@@ -51,6 +48,7 @@ from .const import (
     DATA_ENTITY_VALUES,
     DATA_NETWORK,
     DATA_ZWAVE_CONFIG,
+    DATA_ZWAVE_CONFIG_YAML_PRESENT,
     DEFAULT_CONF_AUTOHEAL,
     DEFAULT_CONF_USB_STICK_PATH,
     DEFAULT_DEBUG,
@@ -58,11 +56,13 @@ from .const import (
     DOMAIN,
 )
 from .discovery_schemas import DISCOVERY_SCHEMAS
+from .migration import async_get_ozw_migration_data, async_is_ozw_migrated
 from .node_entity import ZWaveBaseEntity, ZWaveNodeEntity
 from .util import (
     check_has_unique_id,
     check_node_schema,
     check_value_schema,
+    compute_value_unique_id,
     is_node_parsed,
     node_device_id_and_name,
     node_name,
@@ -83,8 +83,6 @@ CONF_REFRESH_DELAY = "delay"
 CONF_DEVICE_CONFIG = "device_config"
 CONF_DEVICE_CONFIG_GLOB = "device_config_glob"
 CONF_DEVICE_CONFIG_DOMAIN = "device_config_domain"
-
-DATA_ZWAVE_CONFIG_YAML_PRESENT = "zwave_config_yaml_present"
 
 DEFAULT_CONF_IGNORED = False
 DEFAULT_CONF_INVERT_OPENCLOSE_BUTTONS = False
@@ -253,74 +251,6 @@ CONFIG_SCHEMA = vol.Schema(
     },
     extra=vol.ALLOW_EXTRA,
 )
-
-
-async def async_get_ozw_migration_data(hass):
-    """Return dict with info for migration to ozw integration."""
-    data_to_migrate = {}
-
-    zwave_config_entries = hass.config_entries.async_entries(DOMAIN)
-    if not zwave_config_entries:
-        _LOGGER.error("Config entry not set up")
-        return data_to_migrate
-
-    if hass.data.get(DATA_ZWAVE_CONFIG_YAML_PRESENT):
-        _LOGGER.warning(
-            "Remove %s from configuration.yaml "
-            "to avoid setting up this integration on restart "
-            "after completing migration to ozw",
-            DOMAIN,
-        )
-
-    config_entry = zwave_config_entries[0]  # zwave only has a single config entry
-    ent_reg = await async_get_entity_registry(hass)
-    entity_entries = async_entries_for_config_entry(ent_reg, config_entry.entry_id)
-    unique_entries = {entry.unique_id: entry for entry in entity_entries}
-    dev_reg = await async_get_device_registry(hass)
-
-    for entity_values in hass.data[DATA_ENTITY_VALUES]:
-        node = entity_values.primary.node
-        unique_id = compute_value_unique_id(node, entity_values.primary)
-        if unique_id not in unique_entries:
-            continue
-        entity_entry = unique_entries[unique_id]
-        device_identifier, _ = node_device_id_and_name(
-            node, entity_values.primary.instance
-        )
-        device_entry = dev_reg.async_get_device({device_identifier}, set())
-        data_to_migrate[unique_id] = {
-            "node_id": node.node_id,
-            "node_instance": entity_values.primary.instance,
-            "command_class": entity_values.primary.command_class,
-            "command_class_label": entity_values.primary.label,
-            "value_index": entity_values.primary.index,
-            "device_id": device_entry.id,
-            "domain": entity_entry.domain,
-            "entity_id": entity_entry.entity_id,
-            "unique_id": unique_id,
-            "unit_of_measurement": entity_entry.unit_of_measurement,
-        }
-
-    save_path = Path(hass.config.path("zwave_migration_data.json"))
-    await hass.async_add_executor_job(
-        save_path.write_text, json.dumps(data_to_migrate, indent=2)
-    )
-
-    _LOGGER.debug("Collected migration data: %s", data_to_migrate)
-
-    return data_to_migrate
-
-
-@callback
-def async_is_ozw_migrated(hass):
-    """Return True if migration to ozw is done."""
-    ozw_config_entries = hass.config_entries.async_entries("ozw")
-    if not ozw_config_entries:
-        return False
-
-    ozw_config_entry = ozw_config_entries[0]  # only one ozw entry is allowed
-    migrated = bool(ozw_config_entry.data.get("migrated"))
-    return migrated
 
 
 def _obj_to_dict(obj):
@@ -1399,8 +1329,3 @@ class ZWaveDeviceEntity(ZWaveBaseEntity):
         ) or self.node.is_ready:
             return compute_value_unique_id(self.node, self.values.primary)
         return None
-
-
-def compute_value_unique_id(node, value):
-    """Compute unique_id a value would get if it were to get one."""
-    return f"{node.node_id}-{value.object_id}"
