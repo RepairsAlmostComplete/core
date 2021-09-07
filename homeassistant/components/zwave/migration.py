@@ -1,9 +1,7 @@
 """Handle migration from legacy Z-Wave to OpenZWave and Z-Wave JS."""
 from __future__ import annotations
 
-import json
 import logging
-from pathlib import Path
 from typing import cast
 
 from homeassistant.config_entries import ConfigEntry
@@ -27,49 +25,6 @@ STORAGE_KEY = f"{DOMAIN}.legacy_zwave_migration"
 STORAGE_VERSION = 1
 
 
-async def async_get_ozw_migration_data(
-    hass: HomeAssistant, config_entry: ConfigEntry
-) -> dict:
-    """Return dict with info for migration to ozw integration."""
-    data_to_migrate = {}
-    ent_reg = await async_get_entity_registry(hass)
-    entity_entries = async_entries_for_config_entry(ent_reg, config_entry.entry_id)
-    unique_entries = {entry.unique_id: entry for entry in entity_entries}
-    dev_reg = await async_get_device_registry(hass)
-
-    for entity_values in hass.data[DATA_ENTITY_VALUES]:
-        node = entity_values.primary.node
-        unique_id = compute_value_unique_id(node, entity_values.primary)
-        if unique_id not in unique_entries:
-            continue
-        entity_entry = unique_entries[unique_id]
-        device_identifier, _ = node_device_id_and_name(
-            node, entity_values.primary.instance
-        )
-        device_entry = dev_reg.async_get_device({device_identifier}, set())
-        data_to_migrate[unique_id] = {
-            "node_id": node.node_id,
-            "node_instance": entity_values.primary.instance,
-            "command_class": entity_values.primary.command_class,
-            "command_class_label": entity_values.primary.label,
-            "value_index": entity_values.primary.index,
-            "device_id": device_entry.id,
-            "domain": entity_entry.domain,
-            "entity_id": entity_entry.entity_id,
-            "unique_id": unique_id,
-            "unit_of_measurement": entity_entry.unit_of_measurement,
-        }
-
-    save_path = Path(hass.config.path("zwave_migration_data.json"))
-    await hass.async_add_executor_job(
-        save_path.write_text, json.dumps(data_to_migrate, indent=2)
-    )
-
-    _LOGGER.debug("Collected migration data: %s", data_to_migrate)
-
-    return data_to_migrate
-
-
 @callback
 def async_is_ozw_migrated(hass):
     """Return True if migration to ozw is done."""
@@ -80,6 +35,24 @@ def async_is_ozw_migrated(hass):
     ozw_config_entry = ozw_config_entries[0]  # only one ozw entry is allowed
     migrated = bool(ozw_config_entry.data.get("migrated"))
     return migrated
+
+
+@callback
+def async_generate_migration_data(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> None:
+    """Generate Z-Wave migration data."""
+    migration_handler = get_legacy_zwave_migration(hass)
+    migration_handler.generate_data(config_entry)
+
+
+@callback
+def async_get_migration_data(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> dict[str, dict[str, int | str | None]]:
+    """Return Z-Wave migration data."""
+    migration_handler = get_legacy_zwave_migration(hass)
+    return migration_handler.get_data(config_entry)
 
 
 @singleton(LEGACY_ZWAVE_MIGRATION)
@@ -153,25 +126,10 @@ class LegacyZWaveMigration:
 
         self.save_data({config_entry.entry_id: data})
 
-    async def get_data(self) -> dict[str, dict[str, int | str | None]]:
+    async def get_data(
+        self, config_entry: ConfigEntry
+    ) -> dict[str, dict[str, int | str | None]]:
         """Return Z-Wave migration data."""
         await self.load_data()
-        return self._data
-
-
-@callback
-def async_generate_migration_data(
-    hass: HomeAssistant, config_entry: ConfigEntry
-) -> None:
-    """Generate Z-Wave migration data."""
-    migration_handler = get_legacy_zwave_migration(hass)
-    migration_handler.generate_data(config_entry)
-
-
-@callback
-def async_get_migration_data(
-    hass: HomeAssistant,
-) -> dict[str, dict[str, int | str | None]]:
-    """Return Z-Wave migration data."""
-    migration_handler = get_legacy_zwave_migration(hass)
-    return migration_handler.get_data()
+        data = self._data.get(config_entry.entry_id)
+        return data or {}
