@@ -58,6 +58,10 @@ STORAGE_VERSION = 1
 # Something corresponding to propertyKeyName missing in zwave
 # Check if we can get the meterType from openzwave
 
+# Update ozw tests after zwave migration change.
+# Include the migration mapping logic in a function.
+# Write a websocket command for zwave_js migration.
+
 NOTIFICATION_CC_LABEL_TO_PROPERTY_NAME = {
     "Smoke": "Smoke Alarm",
     "Carbon Monoxide": "CO Alarm",
