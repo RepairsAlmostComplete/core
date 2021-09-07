@@ -191,7 +191,7 @@ async def websocket_migrate_zwave(hass, connection, msg):
     zwave = hass.components.zwave
     zwave_config_entries = hass.config_entries.async_entries(ZWAVE_DOMAIN)
     zwave_config_entry = zwave_config_entries[0]  # zwave only has a single config entry
-    zwave_data = zwave.async_get_migration_data(hass, zwave_config_entry)
+    zwave_data = await zwave.async_get_migration_data(hass, zwave_config_entry)
     _LOGGER.debug("Migration zwave data: %s", zwave_data)
 
     ozw_data = await async_get_migration_data(hass)
