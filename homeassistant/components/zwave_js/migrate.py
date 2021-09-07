@@ -58,7 +58,7 @@ STORAGE_VERSION = 1
 # Something corresponding to propertyKeyName missing in zwave
 # Check if we can get the meterType from openzwave
 
-# Update ozw tests after zwave migration change.
+# Update zwave_js migration to be similar to zwave migration.
 # Include the migration mapping logic in a function.
 # Write a websocket command for zwave_js migration.
 
