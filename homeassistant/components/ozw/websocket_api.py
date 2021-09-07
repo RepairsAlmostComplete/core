@@ -20,6 +20,7 @@ import voluptuous as vol
 import voluptuous_serialize
 
 from homeassistant.components import websocket_api
+from homeassistant.components.zwave import DOMAIN as ZWAVE_DOMAIN
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 
@@ -188,7 +189,9 @@ async def websocket_migrate_zwave(hass, connection, msg):
         return
 
     zwave = hass.components.zwave
-    zwave_data = await zwave.async_get_ozw_migration_data(hass)
+    zwave_config_entries = hass.config_entries.async_entries(ZWAVE_DOMAIN)
+    zwave_config_entry = zwave_config_entries[0]  # zwave only has a single config entry
+    zwave_data = zwave.async_get_migration_data(hass, zwave_config_entry)
     _LOGGER.debug("Migration zwave data: %s", zwave_data)
 
     ozw_data = await async_get_migration_data(hass)

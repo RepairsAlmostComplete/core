@@ -136,7 +136,7 @@ def zwave_integration_fixture(hass, zwave_migration_data):
     zwave_config_entry = MockConfigEntry(domain="zwave", data={"usb_path": "/dev/test"})
     zwave_config_entry.add_to_hass(hass)
     with patch(
-        "homeassistant.components.zwave.async_get_ozw_migration_data",
+        "homeassistant.components.zwave.async_get_migration_data",
         return_value=zwave_migration_data,
     ):
         yield zwave_config_entry
