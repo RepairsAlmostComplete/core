@@ -46,13 +46,12 @@ def async_generate_migration_data(
     migration_handler.generate_data(config_entry)
 
 
-@callback
-def async_get_migration_data(
+async def async_get_migration_data(
     hass: HomeAssistant, config_entry: ConfigEntry
 ) -> dict[str, dict[str, int | str | None]]:
     """Return Z-Wave migration data."""
     migration_handler = get_legacy_zwave_migration(hass)
-    return migration_handler.get_data(config_entry)
+    return await migration_handler.get_data(config_entry)
 
 
 @singleton(LEGACY_ZWAVE_MIGRATION)
