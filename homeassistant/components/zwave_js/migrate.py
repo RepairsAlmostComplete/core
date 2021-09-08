@@ -118,6 +118,25 @@ CC_ID_LABEL_TO_PROPERTY = {
 }
 
 
+@callback
+def async_generate_migration_data(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    all_discovered_values: dict[str, ZwaveDiscoveryInfo],
+) -> None:
+    """Generate Z-Wave JS migration data."""
+    migration_handler: LegacyZWaveMigration = get_legacy_zwave_migration(hass)
+    migration_handler.generate_data(config_entry, all_discovered_values)
+
+
+async def async_get_migration_data(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> dict[str, dict[str, int | str | None]]:
+    """Return Z-Wave JS migration data."""
+    migration_handler: LegacyZWaveMigration = get_legacy_zwave_migration(hass)
+    return await migration_handler.get_data(config_entry)
+
+
 @singleton(LEGACY_ZWAVE_MIGRATION)
 @callback
 def get_legacy_zwave_migration(hass: HomeAssistant) -> LegacyZWaveMigration:
@@ -132,28 +151,29 @@ class LegacyZWaveMigration:
         """Set up migration instance."""
         self._hass = hass
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        self._zwave_js_data: dict[str, dict[str, dict[str, int | str | None]]] = {}
+        self._data: dict[str, dict[str, dict[str, int | str | None]]] = {}
 
-    async def load_zwave_js_data(self) -> None:
+    async def load_data(self) -> None:
         """Load Z-Wave JS migration data."""
         stored = cast(dict, await self._store.async_load())
         if stored:
-            self._zwave_js_data = stored
+            self._data = stored
 
     @callback
-    def save_zwave_js_data(
+    def save_data(
         self, data: dict[str, dict[str, dict[str, int | str | None]]]
     ) -> None:
         """Save Z-Wave JS migration data."""
-        self._zwave_js_data.update(data)
+        self._data.update(data)
         self._store.async_delay_save(self._data_to_save, STORAGE_WRITE_DELAY)
 
     @callback
     def _data_to_save(self) -> dict[str, dict[str, dict[str, int | str | None]]]:
         """Return data to save."""
-        return self._zwave_js_data
+        return self._data
 
-    async def generate_zwave_js_data(
+    @callback
+    def generate_data(
         self,
         config_entry: ConfigEntry,
         all_discovered_values: dict[str, ZwaveDiscoveryInfo],
@@ -196,14 +216,14 @@ class LegacyZWaveMigration:
 
         _LOGGER.debug("Collected migration data: %s", data)
 
-        self.save_zwave_js_data({config_entry.entry_id: data})
+        self.save_data({config_entry.entry_id: data})
 
-    async def get_entry_zwave_js_data(
+    async def get_data(
         self, config_entry: ConfigEntry
     ) -> dict[str, dict[str, int | str | None]]:
         """Return Z-Wave JS migration data for a config entry."""
-        await self.load_zwave_js_data()
-        data = self._zwave_js_data.get(config_entry.entry_id)
+        await self.load_data()
+        data = self._data.get(config_entry.entry_id)
         return data or {}
 
 

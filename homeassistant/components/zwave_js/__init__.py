@@ -185,9 +185,7 @@ async def async_setup_entry(  # noqa: C901
 
         # Check if all known nodes are ready to collect migration data
         if all(node.ready for node in client.driver.controller.nodes.values()):
-            await legacy_zwave_migration.generate_zwave_js_data(
-                entry, all_discovered_values
-            )
+            legacy_zwave_migration.generate_data(entry, all_discovered_values)
 
         # add listener for value updated events if necessary
         if value_updates_disc_info:
