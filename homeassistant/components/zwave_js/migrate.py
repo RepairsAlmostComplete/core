@@ -201,6 +201,12 @@ class LegacyZWaveMigration:
             if not device_entry:
                 _LOGGER.debug("Missing device entry for: %s", device_identifier)
                 continue
+
+            unit = entity_entry.unit_of_measurement
+            unit = unit and unit.lower()
+            if unit == "":
+                unit = None
+
             data[unique_id] = {
                 "node_id": node.node_id,
                 "endpoint_index": node.index,
@@ -212,7 +218,7 @@ class LegacyZWaveMigration:
                 "domain": entity_entry.domain,
                 "entity_id": entity_entry.entity_id,
                 "unique_id": unique_id,
-                "unit_of_measurement": entity_entry.unit_of_measurement,
+                "unit_of_measurement": unit,
             }
 
         _LOGGER.debug("Collected migration data: %s", data)
