@@ -108,6 +108,12 @@ class LegacyZWaveMigration:
                 node, entity_values.primary.instance
             )
             device_entry = dev_reg.async_get_device({device_identifier}, set())
+
+            unit = entity_entry.unit_of_measurement
+            unit = unit and unit.lower()
+            if unit == "":
+                unit = None
+
             data[unique_id] = {
                 "node_id": node.node_id,
                 "node_instance": entity_values.primary.instance,
@@ -118,7 +124,7 @@ class LegacyZWaveMigration:
                 "domain": entity_entry.domain,
                 "entity_id": entity_entry.entity_id,
                 "unique_id": unique_id,
-                "unit_of_measurement": entity_entry.unit_of_measurement,
+                "unit_of_measurement": unit,
             }
 
         _LOGGER.debug("Collected migration data: %s", data)
