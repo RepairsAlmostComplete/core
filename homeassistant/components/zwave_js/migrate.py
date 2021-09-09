@@ -144,7 +144,7 @@ def async_generate_migration_data(
 
 async def async_get_migration_data(
     hass: HomeAssistant, config_entry: ConfigEntry
-) -> dict[str, dict[str, int | str | None]]:
+) -> dict[str, ZWaveJSMigrationData]:
     """Return Z-Wave JS migration data."""
     migration_handler: LegacyZWaveMigration = get_legacy_zwave_migration(hass)
     return await migration_handler.get_data(config_entry)
@@ -164,7 +164,7 @@ class LegacyZWaveMigration:
         """Set up migration instance."""
         self._hass = hass
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        self._data: dict[str, dict[str, dict[str, int | str | None]]] = {}
+        self._data: dict[str, dict[str, ZWaveJSMigrationData]] = {}
 
     async def load_data(self) -> None:
         """Load Z-Wave JS migration data."""
@@ -173,15 +173,13 @@ class LegacyZWaveMigration:
             self._data = stored
 
     @callback
-    def save_data(
-        self, data: dict[str, dict[str, dict[str, int | str | None]]]
-    ) -> None:
+    def save_data(self, data: dict[str, dict[str, ZWaveJSMigrationData]]) -> None:
         """Save Z-Wave JS migration data."""
         self._data.update(data)
         self._store.async_delay_save(self._data_to_save, STORAGE_WRITE_DELAY)
 
     @callback
-    def _data_to_save(self) -> dict[str, dict[str, dict[str, int | str | None]]]:
+    def _data_to_save(self) -> dict[str, dict[str, ZWaveJSMigrationData]]:
         """Return data to save."""
         return self._data
 
@@ -192,7 +190,7 @@ class LegacyZWaveMigration:
         all_discovered_values: dict[str, ZwaveDiscoveryInfo],
     ) -> None:
         """Create zwave_js side migration data for a config entry."""
-        data: dict[str, dict[str, int | str | None]] = {}
+        data: dict[str, ZWaveJSMigrationData] = {}
         ent_reg = async_get_entity_registry(self._hass)
         entity_entries = async_entries_for_config_entry(ent_reg, config_entry.entry_id)
         unique_entries = {entry.unique_id: entry for entry in entity_entries}
@@ -240,7 +238,7 @@ class LegacyZWaveMigration:
 
     async def get_data(
         self, config_entry: ConfigEntry
-    ) -> dict[str, dict[str, int | str | None]]:
+    ) -> dict[str, ZWaveJSMigrationData]:
         """Return Z-Wave JS migration data for a config entry."""
         await self.load_data()
         data = self._data.get(config_entry.entry_id)
