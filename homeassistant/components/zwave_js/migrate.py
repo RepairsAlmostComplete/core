@@ -202,6 +202,7 @@ class LegacyZWaveMigration:
                 _LOGGER.debug("Missing device entry for: %s", device_identifier)
                 continue
 
+            # Normalize unit of measurement.
             unit = entity_entry.unit_of_measurement
             unit = unit and unit.lower()
             if unit == "":
