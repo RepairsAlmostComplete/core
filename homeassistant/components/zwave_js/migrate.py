@@ -1,9 +1,9 @@
 """Functions used to migrate unique IDs for Z-Wave JS entities."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
-from typing import cast
+from typing import TypedDict, cast
 
 from zwave_js_server.client import Client as ZwaveClient
 from zwave_js_server.model.value import Value as ZwaveValue
@@ -117,6 +117,45 @@ CC_ID_LABEL_TO_PROPERTY = {
     49: SENSOR_MULTILEVEL_CC_LABEL_TO_PROPERTY_NAME,
     113: NOTIFICATION_CC_LABEL_TO_PROPERTY_NAME,
 }
+
+
+class ZWaveMigrationData(TypedDict):
+    """Represent the Z-Wave migration data dict."""
+
+    node_id: int
+    node_instance: int
+    command_class: int
+    command_class_label: str
+    value_index: int
+    device_id: str
+    domain: str
+    entity_id: str
+    unique_id: str
+    unit_of_measurement: str | None
+
+
+class ZWaveJSMigrationData(TypedDict):
+    """Represent the Z-Wave JS migration data dict."""
+
+    node_id: int
+    endpoint_index: int
+    command_class: int
+    value_property_name: str
+    value_property_key_name: str | None
+    value_id: str
+    device_id: str
+    domain: str
+    entity_id: str
+    unique_id: str
+    unit_of_measurement: str | None
+
+
+@dataclass
+class LegacyZWaveMappedData:
+    """Represent the mapped data between Z-Wave and Z-Wave JS."""
+
+    entity_entries: dict[str, ZWaveMigrationData] = field(default_factory=dict)
+    device_entries: dict[str, str] = field(default_factory=dict)
 
 
 @callback
@@ -233,6 +272,79 @@ class LegacyZWaveMigration:
         await self.load_data()
         data = self._data.get(config_entry.entry_id)
         return data or {}
+
+    @callback
+    def map_node_values(
+        self,
+        zwave_data: dict[str, ZWaveMigrationData],
+        zwave_js_data: dict[str, ZWaveJSMigrationData],
+    ) -> LegacyZWaveMappedData:
+        """Map Z-Wave node values onto Z-Wave JS node values."""
+        migrated_data = LegacyZWaveMappedData()
+        zwave_proc_data: dict[
+            tuple[int, int, int, str, str | None, str | None],
+            ZWaveMigrationData,
+        ] = {}
+        zwave_js_proc_data: dict[
+            tuple[int, int, int, str, str | None, str | None],
+            ZWaveJSMigrationData,
+        ] = {}
+
+        for zwave_item in zwave_data.values():
+            zwave_js_property_name = CC_ID_LABEL_TO_PROPERTY.get(
+                zwave_item["command_class"], {}
+            ).get(zwave_item["command_class_label"])
+            item_id = (
+                zwave_item["node_id"],
+                zwave_item["command_class"],
+                zwave_item["node_instance"] - 1,
+                zwave_item["domain"],
+                zwave_item["unit_of_measurement"],
+                zwave_js_property_name,
+            )
+
+            # Remove duplicates that are not resolvable.
+            if item_id in zwave_proc_data:
+                zwave_proc_data.pop(item_id)
+                continue
+
+            zwave_proc_data[item_id] = zwave_item
+
+        for zwave_js_item in zwave_js_data.values():
+            if zwave_js_item["command_class"] in CC_ID_LABEL_TO_PROPERTY:
+                zwave_js_property_name = zwave_js_item["value_property_name"]
+            else:
+                zwave_js_property_name = None
+            item_id = (
+                zwave_js_item["node_id"],
+                zwave_js_item["command_class"],
+                zwave_js_item["endpoint_index"],
+                zwave_js_item["domain"],
+                zwave_js_item["unit_of_measurement"],
+                zwave_js_property_name,
+            )
+
+            # Remove duplicates that are not resolvable.
+            if item_id in zwave_js_proc_data:
+                zwave_js_proc_data.pop(item_id)
+                continue
+
+            zwave_js_proc_data[item_id] = zwave_js_item
+
+        for item_id, zwave_entry in zwave_proc_data.items():
+            zwave_js_entry: ZWaveJSMigrationData | None = zwave_js_proc_data.pop(
+                item_id, None
+            )
+
+            if zwave_js_entry is None:
+                continue
+
+            zwave_device_id: str = zwave_entry["device_id"]
+            zwave_js_device_id: str = zwave_js_entry["device_id"]
+            migrated_data.entity_entries[zwave_js_entry["entity_id"]] = zwave_entry
+            migrated_data.device_entries[zwave_js_device_id] = zwave_device_id
+
+        return migrated_data
 
 
 @dataclass
