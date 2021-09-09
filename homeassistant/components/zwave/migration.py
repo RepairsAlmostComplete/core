@@ -109,6 +109,7 @@ class LegacyZWaveMigration:
             )
             device_entry = dev_reg.async_get_device({device_identifier}, set())
 
+            # Normalize unit of measurement.
             unit = entity_entry.unit_of_measurement
             unit = unit and unit.lower()
             if unit == "":
