@@ -36,33 +36,6 @@ STORAGE_WRITE_DELAY = 30
 STORAGE_KEY = f"{DOMAIN}.legacy_zwave_migration"
 STORAGE_VERSION = 1
 
-# Use the following data to map entity entries
-# between zwave and zwave_js:
-# entity domain
-# node id
-# command class
-# node instance (index 1) to endpoint index (index 0)
-# unit of measurement
-# label map to property if map has item
-
-# Create maps for all CCs and platforms
-# where there is more than one entity per CC.
-
-# CC 49: https://github.com/zwave-js/node-zwave-js/blob/master/packages/config/config/sensorTypes.json
-# Map: label to propertyName
-# CC 50: https://github.com/zwave-js/node-zwave-js/blob/master/packages/config/config/meters.json
-# Map: label to propertyKeyName
-# CC 113: https://github.com/zwave-js/node-zwave-js/blob/master/packages/config/config/notifications.json
-# Map: label to propertyName
-# TODO: How to map CC 113 completely.
-# Something corresponding to propertyKeyName missing in zwave
-# Check if we can get the meterType from openzwave
-
-# Fix notification CC to not include the value for migration
-# if more than one value exists for that propertyName and node.
-# Include the migration mapping logic in a function.
-# Write a websocket command for zwave_js migration.
-
 NOTIFICATION_CC_LABEL_TO_PROPERTY_NAME = {
     "Smoke": "Smoke Alarm",
     "Carbon Monoxide": "CO Alarm",
