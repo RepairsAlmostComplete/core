@@ -333,17 +333,15 @@ class LegacyZWaveMigration:
             zwave_js_proc_data[item_id] = zwave_js_item
 
         for item_id, zwave_entry in zwave_proc_data.items():
-            zwave_js_entry: ZWaveJSMigrationData | None = zwave_js_proc_data.pop(
-                item_id, None
-            )
+            zwave_js_entry = zwave_js_proc_data.pop(item_id, None)
 
             if zwave_js_entry is None:
                 continue
 
-            zwave_device_id: str = zwave_entry["device_id"]
-            zwave_js_device_id: str = zwave_js_entry["device_id"]
             migrated_data.entity_entries[zwave_js_entry["entity_id"]] = zwave_entry
-            migrated_data.device_entries[zwave_js_device_id] = zwave_device_id
+            migrated_data.device_entries[zwave_js_entry["device_id"]] = zwave_entry[
+                "device_id"
+            ]
 
         return migrated_data
 
