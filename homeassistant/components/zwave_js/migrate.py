@@ -311,6 +311,7 @@ class LegacyZWaveMigration:
             zwave_proc_data[item_id] = zwave_item
 
         for zwave_js_item in zwave_js_data.values():
+            # Only identify with property name if there is a command class label map.
             if zwave_js_item["command_class"] in CC_ID_LABEL_TO_PROPERTY:
                 zwave_js_property_name = zwave_js_item["value_property_name"]
             else:
