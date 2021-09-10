@@ -32,6 +32,7 @@ from .helpers import get_device_id, get_unique_id
 _LOGGER = logging.getLogger(__name__)
 
 LEGACY_ZWAVE_MIGRATION = f"{DOMAIN}_legacy_zwave_migration"
+MIGRATED = "migrated"
 STORAGE_WRITE_DELAY = 30
 STORAGE_KEY = f"{DOMAIN}.legacy_zwave_migration"
 STORAGE_VERSION = 1
@@ -251,7 +252,7 @@ class LegacyZWaveMigration:
         zwave_js_data: dict[str, ZWaveJSMigrationData],
     ) -> LegacyZWaveMappedData:
         """Map Z-Wave node values onto Z-Wave JS node values."""
-        migrated_data = LegacyZWaveMappedData()
+        migration_map = LegacyZWaveMappedData()
         zwave_proc_data: dict[
             tuple[int, int, int, str, str | None, str | None],
             ZWaveMigrationData,
@@ -309,12 +310,53 @@ class LegacyZWaveMigration:
             if zwave_js_entry is None:
                 continue
 
-            migrated_data.entity_entries[zwave_js_entry["entity_id"]] = zwave_entry
-            migrated_data.device_entries[zwave_js_entry["device_id"]] = zwave_entry[
+            migration_map.entity_entries[zwave_js_entry["entity_id"]] = zwave_entry
+            migration_map.device_entries[zwave_js_entry["device_id"]] = zwave_entry[
                 "device_id"
             ]
 
-        return migrated_data
+        return migration_map
+
+
+async def async_migrate_legacy_zwave(
+    hass: HomeAssistant,
+    zwave_config_entry: ConfigEntry,
+    zwave_js_config_entry: ConfigEntry,
+    migration_map: LegacyZWaveMappedData,
+) -> None:
+    """Perform Z-Wave to Z-Wave JS migration."""
+    dev_reg = async_get_device_registry(hass)
+    for zwave_js_device_id, zwave_device_id in migration_map.device_entries.items():
+        zwave_device_entry = dev_reg.async_get(zwave_device_id)
+        if not zwave_device_entry:
+            continue
+        dev_reg.async_update_device(
+            zwave_js_device_id,
+            area_id=zwave_device_entry.area_id,
+            name_by_user=zwave_device_entry.name_by_user,
+        )
+
+    ent_reg = async_get_entity_registry(hass)
+    for zwave_js_entity_id, zwave_entry in migration_map.entity_entries.items():
+        zwave_entity_id = zwave_entry["entity_id"]
+        entity_entry = ent_reg.async_get(zwave_entity_id)
+        if not entity_entry:
+            continue
+        ent_reg.async_remove(zwave_entity_id)
+        ent_reg.async_update_entity(
+            zwave_js_entity_id,
+            new_entity_id=entity_entry.entity_id,
+            name=entity_entry.name,
+            icon=entity_entry.icon,
+        )
+
+    await hass.config_entries.async_remove(zwave_config_entry.entry_id)
+
+    updates = {
+        **zwave_js_config_entry.data,
+        MIGRATED: True,
+    }
+    hass.config_entries.async_update_entry(zwave_js_config_entry, data=updates)
 
 
 @dataclass
