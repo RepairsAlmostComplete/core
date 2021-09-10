@@ -245,77 +245,77 @@ class LegacyZWaveMigration:
         data = self._data.get(config_entry.entry_id)
         return data or {}
 
-    @callback
-    def map_node_values(
-        self,
-        zwave_data: dict[str, ZWaveMigrationData],
-        zwave_js_data: dict[str, ZWaveJSMigrationData],
-    ) -> LegacyZWaveMappedData:
-        """Map Z-Wave node values onto Z-Wave JS node values."""
-        migration_map = LegacyZWaveMappedData()
-        zwave_proc_data: dict[
-            tuple[int, int, int, str, str | None, str | None],
-            ZWaveMigrationData,
-        ] = {}
-        zwave_js_proc_data: dict[
-            tuple[int, int, int, str, str | None, str | None],
-            ZWaveJSMigrationData,
-        ] = {}
 
-        for zwave_item in zwave_data.values():
-            zwave_js_property_name = CC_ID_LABEL_TO_PROPERTY.get(
-                zwave_item["command_class"], {}
-            ).get(zwave_item["command_class_label"])
-            item_id = (
-                zwave_item["node_id"],
-                zwave_item["command_class"],
-                zwave_item["node_instance"] - 1,
-                zwave_item["domain"],
-                zwave_item["unit_of_measurement"],
-                zwave_js_property_name,
-            )
+@callback
+def async_map_legacy_zwave_values(
+    zwave_data: dict[str, ZWaveMigrationData],
+    zwave_js_data: dict[str, ZWaveJSMigrationData],
+) -> LegacyZWaveMappedData:
+    """Map Z-Wave node values onto Z-Wave JS node values."""
+    migration_map = LegacyZWaveMappedData()
+    zwave_proc_data: dict[
+        tuple[int, int, int, str, str | None, str | None],
+        ZWaveMigrationData,
+    ] = {}
+    zwave_js_proc_data: dict[
+        tuple[int, int, int, str, str | None, str | None],
+        ZWaveJSMigrationData,
+    ] = {}
 
-            # Remove duplicates that are not resolvable.
-            if item_id in zwave_proc_data:
-                zwave_proc_data.pop(item_id)
-                continue
+    for zwave_item in zwave_data.values():
+        zwave_js_property_name = CC_ID_LABEL_TO_PROPERTY.get(
+            zwave_item["command_class"], {}
+        ).get(zwave_item["command_class_label"])
+        item_id = (
+            zwave_item["node_id"],
+            zwave_item["command_class"],
+            zwave_item["node_instance"] - 1,
+            zwave_item["domain"],
+            zwave_item["unit_of_measurement"],
+            zwave_js_property_name,
+        )
 
-            zwave_proc_data[item_id] = zwave_item
+        # Remove duplicates that are not resolvable.
+        if item_id in zwave_proc_data:
+            zwave_proc_data.pop(item_id)
+            continue
 
-        for zwave_js_item in zwave_js_data.values():
-            # Only identify with property name if there is a command class label map.
-            if zwave_js_item["command_class"] in CC_ID_LABEL_TO_PROPERTY:
-                zwave_js_property_name = zwave_js_item["value_property_name"]
-            else:
-                zwave_js_property_name = None
-            item_id = (
-                zwave_js_item["node_id"],
-                zwave_js_item["command_class"],
-                zwave_js_item["endpoint_index"],
-                zwave_js_item["domain"],
-                zwave_js_item["unit_of_measurement"],
-                zwave_js_property_name,
-            )
+        zwave_proc_data[item_id] = zwave_item
 
-            # Remove duplicates that are not resolvable.
-            if item_id in zwave_js_proc_data:
-                zwave_js_proc_data.pop(item_id)
-                continue
+    for zwave_js_item in zwave_js_data.values():
+        # Only identify with property name if there is a command class label map.
+        if zwave_js_item["command_class"] in CC_ID_LABEL_TO_PROPERTY:
+            zwave_js_property_name = zwave_js_item["value_property_name"]
+        else:
+            zwave_js_property_name = None
+        item_id = (
+            zwave_js_item["node_id"],
+            zwave_js_item["command_class"],
+            zwave_js_item["endpoint_index"],
+            zwave_js_item["domain"],
+            zwave_js_item["unit_of_measurement"],
+            zwave_js_property_name,
+        )
 
-            zwave_js_proc_data[item_id] = zwave_js_item
+        # Remove duplicates that are not resolvable.
+        if item_id in zwave_js_proc_data:
+            zwave_js_proc_data.pop(item_id)
+            continue
 
-        for item_id, zwave_entry in zwave_proc_data.items():
-            zwave_js_entry = zwave_js_proc_data.pop(item_id, None)
+        zwave_js_proc_data[item_id] = zwave_js_item
 
-            if zwave_js_entry is None:
-                continue
+    for item_id, zwave_entry in zwave_proc_data.items():
+        zwave_js_entry = zwave_js_proc_data.pop(item_id, None)
 
-            migration_map.entity_entries[zwave_js_entry["entity_id"]] = zwave_entry
-            migration_map.device_entries[zwave_js_entry["device_id"]] = zwave_entry[
-                "device_id"
-            ]
+        if zwave_js_entry is None:
+            continue
 
-        return migration_map
+        migration_map.entity_entries[zwave_js_entry["entity_id"]] = zwave_entry
+        migration_map.device_entries[zwave_js_entry["device_id"]] = zwave_entry[
+            "device_id"
+        ]
+
+    return migration_map
 
 
 async def async_migrate_legacy_zwave(
